@@ -51,10 +51,11 @@ def ws_run():
         status = response.json()['data']['attributes']['status']
         print(f'Terraform is {status} config, script will sleep for 50 secs ..\n')
         time.sleep(50)
-    print('*********Destruction of the Pod Complete******************')
+    print('*********Destruction of the AWS Component Successful******************')
 
 def te_tests():
     print('****************Connecting to TE to delete tests ..****************\n ')
+    trigger = 0
     te_api = open("bbbb", "r")
     header = {"Authorization": f"{'Bearer'} {te_api.read()}", "accept":"application/json", "content-type":"application/json"}
     resposne = requests.get('https://api.thousandeyes.com/v6/tests.json', headers=header)
@@ -63,6 +64,7 @@ def te_tests():
         test_id = x['testId']
         test_type = x['type']
         if re.search(f'TeaStore-API-Call-GPO-FSO-Lab-{pod}.*',x['testName']):
+            trigger = trigger +1
             respos = requests.post(f'https://api.thousandeyes.com/v6/tests/{test_type}/{test_id}/delete.json', headers=header)
             print(respos.status_code)
             if respos.status_code == 204:
@@ -70,10 +72,13 @@ def te_tests():
             else:
                 print(respos.status_code)
                 print('!!!!! ERROR :: TE test not deleted successfully !!!!!!!!!!\n')
+    if trigger == 0:
+        print(f"****************** TE Tests not found for pod {reset}*******************\n")
 
 def te_agents():
     print('****************Connecting to TE to delete Agents..****************\n ')
     te_api = open("bbbb", "r")
+    trigger = 0
     header = {"Authorization": f"{'Bearer'} {te_api.read()}", "accept":"application/json", "content-type":"application/json"}
     resposne = requests.get('https://api.thousandeyes.com/v6/agents.json', headers=header)
     for x in (resposne.json()['agents']):
@@ -81,6 +86,7 @@ def te_agents():
         if x['agentType'] == 'Enterprise':
             id = (x['agentId'])
             if re.search(f'GPO-FSO-Lab-{pod}.*', x['agentName']):
+                trigger = trigger +1
                 respo = requests.post(f'https://api.thousandeyes.com/v6/agents/{id}/delete.json', headers=header)
                 print(respo.status_code)
                 if respo.status_code == 204:
@@ -88,16 +94,20 @@ def te_agents():
                 else:
                     print(respo.status_code)
                     print('!!!!!!!!! ERROR: TE Agent not deleted successfully !!!!!!!!!!!!!11 \n')
+    if trigger == 0:
+        print(f"****************** TE Agents not found for pod {reset}*******************\n")
 
 
 
 def cloudformdel():
     print('*******************Connecting to AWS to clear Cloudformation stack******************* \n')
+    trigger = 0
     client = boto3.client('cloudformation')
     response = client.describe_stacks()
     for x in (response['Stacks']):
         pod = pod_key[str(reset)]['podno']
         if re.search(f"GPO-FSO-Lab-{pod}.*EKS--Stack",x['StackName']):
+            trigger = trigger + 1
             response = client.delete_stack(
                 StackName=x['StackName'])
             print(response['ResponseMetadata']['HTTPStatusCode'])
@@ -106,6 +116,10 @@ def cloudformdel():
             else:
                 print(response['ResponseMetadata']['HTTPStatusCode'])
                 print('!!!!!!!!! ERROR :: Cloudformation stack did not get deleted successfully !!!\n ')
+    if trigger == 0:
+        print(f"**********************Cloudformation Stack not created in AWS for pod {reset}***********************\n")
+
+
 
 
 def ssm(inst_id):
@@ -165,6 +179,19 @@ def ec2():
     print('***********************Instance ID retrieved***************************\n')
     return ec2_value
 
+def cloud9():
+    print("***************************Cloud9 Deletion Start************************\n")
+    client = boto3.client('cloud9')
+    response = client.list_environments(
+    )
+    for x in response['environmentIds']:
+        repo = client.describe_environments(environmentIds=[x, ])
+        if re.search(f".*{reset}-.*", repo['environments'][0]['name']):
+            repo1 = client.delete_environment(environmentId=x)
+            if repo1['ResponseMetadata']['HTTPStatusCode'] == 200:
+                print('**********************Cloud9 Instance deleted Successfully **********************\n')
+            else:
+                print('!!!!!!!!!! ERROR :: Cloud9 Instance not deleted Successfully !!!!!!!!!!!!\n')
 
 
 
@@ -261,6 +288,8 @@ for reset in Pod_to_rest:
             x = y
     ssm(ins_id)
     ws_run()
+    cloud9()
+    print(f"***************** Pod {reset}  Deleted Successfully  :-) *************")
 
 
 
