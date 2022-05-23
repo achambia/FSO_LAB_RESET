@@ -17,10 +17,10 @@ pod_key = {'1':{'podno':'01','workspace':'GPO-FSO-EKS-LAB-1','document':'destroy
            '10': {'podno': '10', 'workspace': 'GPO-FSO-EKS-LAB-10', 'document': 'destroy_pod_10'},
            '11':{'podno':'11','workspace':'SWAT-FSO-TEST','document':'destroy_pod_11'},
            }
-terraform_api = open("aaaa", "r")
-te_api = open("bbbb", "r")
+
 
 def workspace():
+    terraform_api = open("aaaa", "r")
     header = {"Authorization": f"{'Bearer'} {terraform_api.read()}", "Content-Type": "application/vnd.api+json"}
     print('Identifying the Workspace ID\n')
     response = requests.get(f'https://app.terraform.io/api/v2/organizations/Cisco-SRE/workspaces', headers=header)
@@ -31,9 +31,10 @@ def workspace():
     return (ws_id, cv_id)
 
 def ws_run():
+    print('****************Connecting to Terraform to delete Infra ..****************\n ')
+    terraform_api = open("aaaa", "r")
     header = {"Authorization": f"{'Bearer'} {terraform_api.read()}", "Content-Type": "application/vnd.api+json"}
     input_var = workspace()
-    print(input_var)
     print('Initiating run on the workspace \n')
     run_data = json.dumps({"data": {"attributes": {"message": "Trigered via API", 'auto-apply': True, 'is-destroy': True},"type": "runs","relationships": {"workspace": {"data": {"id": input_var[0]}}}}})
     response = requests.post('https://app.terraform.io/api/v2/runs', headers=header, data= run_data)
@@ -53,6 +54,8 @@ def ws_run():
     print('*********Destruction of the Pod Complete******************')
 
 def te_tests():
+    print('****************Connecting to TE to delete tests ..****************\n ')
+    te_api = open("bbbb", "r")
     header = {"Authorization": f"{'Bearer'} {te_api.read()}", "accept":"application/json", "content-type":"application/json"}
     resposne = requests.get('https://api.thousandeyes.com/v6/tests.json', headers=header)
     for x in resposne.json()['test']:
@@ -61,13 +64,16 @@ def te_tests():
         test_type = x['type']
         if re.search(f'TeaStore-API-Call-GPO-FSO-Lab-{pod}.*',x['testName']):
             respos = requests.post(f'https://api.thousandeyes.com/v6/tests/{test_type}/{test_id}/delete.json', headers=header)
+            print(respos.status_code)
             if respos.status_code == 204:
                 print('*****************TE Test deleted successfully .. *******************\n')
             else:
+                print(respos.status_code)
                 print('!!!!! ERROR :: TE test not deleted successfully !!!!!!!!!!\n')
 
 def te_agents():
-    te_api = open("C:\\TE\API.txt", "r")
+    print('****************Connecting to TE to delete Agents..****************\n ')
+    te_api = open("bbbb", "r")
     header = {"Authorization": f"{'Bearer'} {te_api.read()}", "accept":"application/json", "content-type":"application/json"}
     resposne = requests.get('https://api.thousandeyes.com/v6/agents.json', headers=header)
     for x in (resposne.json()['agents']):
@@ -76,14 +82,17 @@ def te_agents():
             id = (x['agentId'])
             if re.search(f'GPO-FSO-Lab-{pod}.*', x['agentName']):
                 respo = requests.post(f'https://api.thousandeyes.com/v6/agents/{id}/delete.json', headers=header)
+                print(respo.status_code)
                 if respo.status_code == 204:
                     print('****************TE Agent deleted successfully ..****************\n ')
                 else:
+                    print(respo.status_code)
                     print('!!!!!!!!! ERROR: TE Agent not deleted successfully !!!!!!!!!!!!!11 \n')
 
 
 
 def cloudformdel():
+    print('*******************Connecting to AWS to clear Cloudformation stack******************* \n')
     client = boto3.client('cloudformation')
     response = client.describe_stacks()
     for x in (response['Stacks']):
@@ -91,13 +100,16 @@ def cloudformdel():
         if re.search(f"GPO-FSO-Lab-{pod}.*EKS--Stack",x['StackName']):
             response = client.delete_stack(
                 StackName=x['StackName'])
+            print(response['ResponseMetadata']['HTTPStatusCode'])
             if response['ResponseMetadata']['HTTPStatusCode'] == 200:
                 print('*******************Cloudformation stack deleted successfully******************* \n')
             else:
+                print(response['ResponseMetadata']['HTTPStatusCode'])
                 print('!!!!!!!!! ERROR :: Cloudformation stack did not get deleted successfully !!!\n ')
 
 
 def ssm(inst_id):
+    print('*************Initiating the Teardown script on the EC2 Instace*********\n')
     client = boto3.client('ssm')
     response = client.send_command(
         InstanceIds=[
@@ -124,6 +136,7 @@ def ssm(inst_id):
 
 
 def update_policy(ins_id):
+    print('**************Connecting to AWS for Role updation to connect to SSM... *******************\n')
     iam = boto3.client('iam')
     ec2_name = ins_id[1]
     role = (re.sub('-VM','-EC2-Access-Role',ec2_name))
@@ -137,6 +150,7 @@ def update_policy(ins_id):
         print('!!! ERROR :: Permissions for Role did not update successfully ...!!!!!\n')
 
 def ec2():
+    print('**************Connecting to AWS to get InstanceID and Name of VM******************\n')
     ec2_value = []
     ec2 = boto3.client('ec2')
     response = ec2.describe_instances()['Reservations']
@@ -148,6 +162,7 @@ def ec2():
                     if re.search(f'{pod}-.*-VM', z['Value']):
                         ec2_value.append(y['InstanceId'])
                         ec2_value.append(z['Value'])
+    print('***********************Instance ID retrieved***************************\n')
     return ec2_value
 
 
@@ -164,6 +179,7 @@ print(ascii_banner)
 
 a = list(input("PLEASE ENTER THE POD YOU WANT TO RESET . FOR MULTIPLE POD RESET USE , OR - (EG. 1-3,5) : "))
 
+
 for b in range(len(a)):
     if a[b] == "-":
         Podattaind.append("-")
@@ -175,7 +191,6 @@ for b in range(len(a)):
         if len(h) == 0:
             h.append(a[b])
             Podattaind.append(a[b])
-
         elif len(h) != 0:
             j = int(len(h))
 
@@ -187,6 +202,9 @@ for b in range(len(a)):
                 elif ',' in h:
                     Podattaind.remove(a[b - 1])
                     Podattaind.append("10")
+                else:
+                    Podattaind.append("10")
+                    Podattaind.remove(a[b - 1])
 
 
             elif (h[j - 1] == "1") and (a[b] == "1"):
@@ -196,6 +214,10 @@ for b in range(len(a)):
                 elif ',' in h:
                     Podattaind.remove(a[b - 1])
                     Podattaind.append("11")
+                else:
+                    Podattaind.append("11")
+                    Podattaind.remove(a[b - 1])
+
 
 
             elif (h[j - 1] == "1") or (h[j - 1] == "2") or (h[j - 1] == "3") or (h[j - 1] == "4") or (
@@ -205,7 +227,6 @@ for b in range(len(a)):
 
             else:
                 Podattaind.append(a[b])
-
 for x in range(len(Podattaind)):
     if Podattaind[x] == '-':
         d = int(Podattaind[x - 1])
@@ -219,12 +240,13 @@ if len(Pod_to_rest) == int(0):
     print("\n\nINVALID POD NUMBER SELECTED\n\n")
     sys.exit()
 for reset in Pod_to_rest:
-    ins_id =ec2()
+    print(f'*******************Destruction of Pod {reset} initiated\n')
+    ins_id = ec2()
     update_policy(ins_id)
     cloudformdel()
     te_tests()
     te_agents()
-    client =  boto3.client('ssm')
+    client = boto3.client('ssm')
     response = client.describe_instance_information(
     )
     for x in response['InstanceInformationList']:
@@ -236,7 +258,7 @@ for reset in Pod_to_rest:
             for y in response['InstanceInformationList']:
                 if y['InstanceId'] == ins_id[0] and y['PingStatus'] == 'Online':
                     break
-            x =y
+            x = y
     ssm(ins_id)
     ws_run()
 
