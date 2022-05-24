@@ -63,10 +63,9 @@ def te_tests():
         pod = pod_key[str(reset)]['podno']
         test_id = x['testId']
         test_type = x['type']
-        if re.search(f'TeaStore-API-Call-GPO-FSO-Lab-{pod}.*',x['testName']):
+        if re.search(f'.*GPO-FSO-Lab-{pod}.*',x['testName']):
             trigger = trigger +1
             respos = requests.post(f'https://api.thousandeyes.com/v6/tests/{test_type}/{test_id}/delete.json', headers=header)
-            print(respos.status_code)
             if respos.status_code == 204:
                 print('*****************TE Test deleted successfully .. *******************\n')
             else:
@@ -142,11 +141,11 @@ def ssm(inst_id):
             response1 = client.list_commands(
                 CommandId=cmd_id,
             )
-        print('Agents removed successfully')
+        print('Agents removed successfully\n')
     except Exception as e:
         if re.search('not in a valid state for account ', str(e)):
-            print('*************Sleeping for 2 mins as Agent not ready for remote execution *************\n')
-            time.sleep(120)
+            print('*************Sleeping for 1 min as Agent not ready for remote execution *************\n')
+            time.sleep(60)
             ssm(inst_id)
 
 
@@ -165,13 +164,13 @@ def update_policy(ins_id):
         print('**************Permissions for Role updated successfully to connect to SSM... *******************\n')
     else:
         print('!!! ERROR :: Permissions for Role did not update successfully ...!!!!!\n')
-    print("Sleeping for 30 secs")
+    print("Sleeping for 30 secs\n")
     time.sleep(30)
     print('**************Connecting to AWS for rebooting EC2 to connect to SSM... *******************\n')
     client = boto3.client('ec2')
     client.reboot_instances(InstanceIds=[ins_id[0]])
-    print("Sleeping for 30 secs")
-    time.sleep(30)
+    print("Sleeping for 60 secs\n")
+    time.sleep(60)
     print('**************Successfully rebooted the EC2... *******************\n')
 
 def ec2():
