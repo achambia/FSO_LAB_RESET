@@ -70,7 +70,6 @@ def te_tests():
             if respos.status_code == 204:
                 print('*****************TE Test deleted successfully .. *******************\n')
             else:
-                print(respos.status_code)
                 print('!!!!! ERROR :: TE test not deleted successfully !!!!!!!!!!\n')
     if trigger == 0:
         print(f"****************** TE Tests not found for pod {reset}*******************\n")
@@ -88,11 +87,9 @@ def te_agents():
             if re.search(f'GPO-FSO-Lab-{pod}.*', x['agentName']):
                 trigger = trigger +1
                 respo = requests.post(f'https://api.thousandeyes.com/v6/agents/{id}/delete.json', headers=header)
-                print(respo.status_code)
                 if respo.status_code == 204:
                     print('****************TE Agent deleted successfully ..****************\n ')
                 else:
-                    print(respo.status_code)
                     print('!!!!!!!!! ERROR: TE Agent not deleted successfully !!!!!!!!!!!!!11 \n')
     if trigger == 0:
         print(f"****************** TE Agents not found for pod {reset}*******************\n")
@@ -106,15 +103,13 @@ def cloudformdel():
     response = client.describe_stacks()
     for x in (response['Stacks']):
         pod = pod_key[str(reset)]['podno']
-        if re.search(f"GPO-FSO-Lab-{pod}.*EKS--Stack",x['StackName']):
+        if re.search(f"GPO-FSO-Lab-{pod}.*EKS-Stack",x['StackName']):
             trigger = trigger + 1
             response = client.delete_stack(
                 StackName=x['StackName'])
-            print(response['ResponseMetadata']['HTTPStatusCode'])
             if response['ResponseMetadata']['HTTPStatusCode'] == 200:
                 print('*******************Cloudformation stack deleted successfully******************* \n')
             else:
-                print(response['ResponseMetadata']['HTTPStatusCode'])
                 print('!!!!!!!!! ERROR :: Cloudformation stack did not get deleted successfully !!!\n ')
     if trigger == 0:
         print(f"**********************Cloudformation Stack not created in AWS for pod {reset}***********************\n")
@@ -123,30 +118,38 @@ def cloudformdel():
 
 
 def ssm(inst_id):
-    print('*************Initiating the Teardown script on the EC2 Instace*********\n')
-    client = boto3.client('ssm')
-    response = client.send_command(
-        InstanceIds=[
-            inst_id[0],
-        ],
-        DocumentName=pod_key[str(reset)]['document'],
-    )
-    cmd_id = response['Command']['CommandId']
-    response1 = client.list_commands(
-        CommandId = cmd_id,
-    )
-    print('Command ran successfully.. sleeping for 6 Mins')
-    time.sleep(360)
-    while response1['Commands'][0]['Status'] != 'Success':
-        if response1['Commands'][0]['Status'] == 'Failed':
-            print('Agent cleanup script failed')
-            break
-        print('Agents not removed yet .. sleeping for 30 secs')
-        time.sleep(30)
+    try:
+        print('*************Initiating the Teardown script on the EC2 Instace*********\n')
+        client = boto3.client('ssm')
+        response = client.send_command(
+            InstanceIds=[
+                inst_id[0],
+            ],
+            DocumentName=pod_key[str(reset)]['document'],
+        )
+        cmd_id = response['Command']['CommandId']
         response1 = client.list_commands(
             CommandId=cmd_id,
         )
-    print('Agents removed successfully')
+        print('Command ran successfully.. sleeping for 6 Mins')
+        time.sleep(360)
+        while response1['Commands'][0]['Status'] != 'Success':
+            if response1['Commands'][0]['Status'] == 'Failed':
+                print('Agent cleanup script failed')
+                break
+            print('Agents not removed yet .. sleeping for 30 secs')
+            time.sleep(30)
+            response1 = client.list_commands(
+                CommandId=cmd_id,
+            )
+        print('Agents removed successfully')
+    except Exception as e:
+        if re.search('not in a valid state for account ', str(e)):
+            print('*************Sleeping for 2 mins as Agent not ready for remote execution *************\n')
+            time.sleep(120)
+            ssm(inst_id)
+
+
 
 
 def update_policy(ins_id):
@@ -155,13 +158,21 @@ def update_policy(ins_id):
     ec2_name = ins_id[1]
     role = (re.sub('-VM','-EC2-Access-Role',ec2_name))
     response = iam.attach_role_policy(
-        PolicyArn='arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM',
+        PolicyArn='arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore',
         RoleName=role
     )
     if response['ResponseMetadata']['HTTPStatusCode'] == 200:
         print('**************Permissions for Role updated successfully to connect to SSM... *******************\n')
     else:
         print('!!! ERROR :: Permissions for Role did not update successfully ...!!!!!\n')
+    print("Sleeping for 30 secs")
+    time.sleep(30)
+    print('**************Connecting to AWS for rebooting EC2 to connect to SSM... *******************\n')
+    client = boto3.client('ec2')
+    client.reboot_instances(InstanceIds=[ins_id[0]])
+    print("Sleeping for 30 secs")
+    time.sleep(30)
+    print('**************Successfully rebooted the EC2... *******************\n')
 
 def ec2():
     print('**************Connecting to AWS to get InstanceID and Name of VM******************\n')
@@ -273,19 +284,6 @@ for reset in Pod_to_rest:
     cloudformdel()
     te_tests()
     te_agents()
-    client = boto3.client('ssm')
-    response = client.describe_instance_information(
-    )
-    for x in response['InstanceInformationList']:
-        while x['InstanceId'] != ins_id[0] and x['PingStatus'] != 'Online':
-            print("Wating for Instance to be controlled by SSM .. SLeeping for 60 secs")
-            time.sleep(60)
-            response = client.describe_instance_information(
-            )
-            for y in response['InstanceInformationList']:
-                if y['InstanceId'] == ins_id[0] and y['PingStatus'] == 'Online':
-                    break
-            x = y
     ssm(ins_id)
     ws_run()
     cloud9()
