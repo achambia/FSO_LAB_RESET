@@ -12,6 +12,7 @@ if platform.system() == 'Windows':
     te_dir = input('Please enter the path where you will like to save the Terraform API Key (eg C:\Thousand_eyes): ')
     te_file = input('Please enter the API Key for Thousand Eyes : ')
     user = input('Enter your Cisco User ID : ')
+    aws_id = str(input('Enter the AWS Account ID : '))
     aws_key = input('Enter your AWS Key ID : ')
     aws_access = input('Enter your AWS Access ID : ')
     terraform_dir = terraform_dir.replace('\\','/')
@@ -25,6 +26,12 @@ if platform.system() == 'Windows':
     data = data.replace('bbbb', f'{te_path}')
     with open('destroy.py','w') as file1:
         file1.write(data)
+    with open('create.py','r') as cedit:
+        cdata = cedit.read()
+    cdata = cdata.replace('aaaa',f'{terraform_path}')
+    cdata = cdata.replace('cccc', f'{aws_id}')
+    with open('create.py','w') as file3:
+        file3.write(cdata)
     os.mkdir(terraform_dir)
     os.chdir(terraform_dir)
     with open('API.txt', 'w') as file:
@@ -47,6 +54,7 @@ elif platform.system() == 'Darwin':
     te_dir = input('Please enter the path where you will like to save the Terraform API Key (eg C:\Thousand_eyes): ')
     te_file = input('Please enter the API Key for Thousand Eyes : ')
     user = input('Enter your Cisco User ID : ')
+    aws_id = str(input('Enter the AWS Account ID : '))
     aws_key = input('Enter your AWS Key ID : ')
     aws_access = input('Enter your AWS Access ID : ')
     terraform_dir = terraform_dir.replace('\\','/')
@@ -60,6 +68,12 @@ elif platform.system() == 'Darwin':
     data = data.replace('bbbb', f'{te_path}')
     with open('destroy.py','w') as file1:
         file1.write(data)
+    with open('create.py','r') as cedit:
+        cdata = cedit.read()
+    cdata = cdata.replace('aaaa',f'{terraform_path}')
+    cdata = cdata.replace('cccc', f'{aws_id}')
+    with open('create.py','w') as file3:
+        file3.write(cdata)
     os.mkdir(terraform_dir)
     os.chdir(terraform_dir)
     with open('API.txt', 'w') as file:
