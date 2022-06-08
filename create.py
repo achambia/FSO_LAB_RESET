@@ -27,7 +27,7 @@ def workspace():
     print('Identifying the Workspace ID\n')
     response = requests.get(f'https://app.terraform.io/api/v2/organizations/Cisco-SRE/workspaces', headers=header)
     for x in response.json()['data']:
-        if x['attributes']['name'] == 'SWAT-FSO-TEST':
+        if x['attributes']['name'] == pod_key[str(reset)]['workspace']:
             ws_id = (x['id'])
             cv_id = (x['relationships']['current-configuration-version']['data']['id'])
     return (ws_id, cv_id)
